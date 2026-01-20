@@ -8,7 +8,7 @@ import { Parser } from './parser';
 import { Compiler } from './compiler';
 import { Interpreter } from './interpreter';
 
-function runCode(source: string): void {
+function runCode(source: string, startServer: boolean = false): void {
   try {
     // Lexer
     const lexer = new Lexer(source);
@@ -25,6 +25,11 @@ function runCode(source: string): void {
     // Interpreter
     const interpreter = new Interpreter(compiled);
     interpreter.run();
+
+    // Start server if endpoints are registered
+    if (startServer && interpreter.hasEndpoints()) {
+      interpreter.startServer();
+    }
   } catch (error) {
     if (error instanceof Error) {
       console.error(error.message);
@@ -34,7 +39,7 @@ function runCode(source: string): void {
   }
 }
 
-function runFile(filePath: string): void {
+function runFile(filePath: string, startServer: boolean = true): void {
   const resolvedPath = path.resolve(filePath);
 
   if (!fs.existsSync(resolvedPath)) {
@@ -43,7 +48,7 @@ function runFile(filePath: string): void {
   }
 
   const source = fs.readFileSync(resolvedPath, 'utf-8');
-  runCode(source);
+  runCode(source, startServer);
 }
 
 function runRepl(): void {

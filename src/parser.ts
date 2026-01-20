@@ -42,6 +42,16 @@ export class Parser {
         return this.parsePrintStatement();
       case TokenType.LBRACE:
         return this.parseBlockStatement();
+      case TokenType.ENDPOINT:
+        return this.parseEndpointDeclaration();
+      case TokenType.MIDDLEWARE:
+        return this.parseMiddlewareDeclaration();
+      case TokenType.USE:
+        return this.parseUseStatement();
+      case TokenType.VALIDATE:
+        return this.parseValidateStatement();
+      case TokenType.SERVER:
+        return this.parseServerDeclaration();
       default:
         return this.parseExpressionStatement();
     }
@@ -200,6 +210,151 @@ export class Parser {
     return { type: 'ExpressionStatement', expression, line };
   }
 
+  // ============ API Parsing ============
+
+  // endpoint GET "/users" { ... }
+  // endpoint POST "/users" use [auth] { ... }
+  private parseEndpointDeclaration(): AST.EndpointDeclaration {
+    const line = this.peek().line;
+    this.consume(TokenType.ENDPOINT, "Expected 'endpoint'");
+
+    // Parse HTTP method
+    const methodToken = this.peek();
+    let method: AST.HttpMethod;
+    if (this.match(TokenType.GET)) {
+      method = 'GET';
+    } else if (this.match(TokenType.POST)) {
+      method = 'POST';
+    } else if (this.match(TokenType.PUT)) {
+      method = 'PUT';
+    } else if (this.match(TokenType.DELETE)) {
+      method = 'DELETE';
+    } else if (this.match(TokenType.PATCH)) {
+      method = 'PATCH';
+    } else {
+      throw this.error(`Expected HTTP method (GET, POST, PUT, DELETE, PATCH), got '${methodToken.value}'`);
+    }
+
+    // Parse path
+    const pathToken = this.consume(TokenType.STRING, "Expected path string");
+    const path = pathToken.value;
+
+    // Parse optional middlewares: use [auth, logger]
+    let middlewares: string[] = [];
+    if (this.match(TokenType.USE)) {
+      this.consume(TokenType.LBRACKET, "Expected '[' after 'use'");
+      if (!this.check(TokenType.RBRACKET)) {
+        do {
+          const mw = this.consume(TokenType.IDENTIFIER, "Expected middleware name");
+          middlewares.push(mw.value);
+        } while (this.match(TokenType.COMMA));
+      }
+      this.consume(TokenType.RBRACKET, "Expected ']'");
+    }
+
+    // Parse body
+    const body = this.parseBlockStatement();
+
+    return { type: 'EndpointDeclaration', method, path, middlewares, body, line };
+  }
+
+  // middleware auth { ... }
+  private parseMiddlewareDeclaration(): AST.MiddlewareDeclaration {
+    const line = this.peek().line;
+    this.consume(TokenType.MIDDLEWARE, "Expected 'middleware'");
+    const name = this.consume(TokenType.IDENTIFIER, "Expected middleware name").value;
+    const body = this.parseBlockStatement();
+
+    return { type: 'MiddlewareDeclaration', name, body, line };
+  }
+
+  // use logger
+  // use [logger, auth]
+  private parseUseStatement(): AST.UseStatement {
+    const line = this.peek().line;
+    this.consume(TokenType.USE, "Expected 'use'");
+
+    const middlewares: string[] = [];
+
+    if (this.match(TokenType.LBRACKET)) {
+      // Array form: use [logger, auth]
+      if (!this.check(TokenType.RBRACKET)) {
+        do {
+          const mw = this.consume(TokenType.IDENTIFIER, "Expected middleware name");
+          middlewares.push(mw.value);
+        } while (this.match(TokenType.COMMA));
+      }
+      this.consume(TokenType.RBRACKET, "Expected ']'");
+    } else {
+      // Single form: use logger
+      const mw = this.consume(TokenType.IDENTIFIER, "Expected middleware name");
+      middlewares.push(mw.value);
+    }
+
+    return { type: 'UseStatement', middlewares, line };
+  }
+
+  // validate req.body {
+  //   name: string
+  //   age: number
+  //   email: optional string
+  // }
+  private parseValidateStatement(): AST.ValidateStatement {
+    const line = this.peek().line;
+    this.consume(TokenType.VALIDATE, "Expected 'validate'");
+
+    // Parse target (e.g., req.body)
+    const target = this.parseExpression();
+
+    this.consume(TokenType.LBRACE, "Expected '{'");
+
+    const fields: AST.ValidationField[] = [];
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      const field = this.parseValidationField();
+      fields.push(field);
+    }
+
+    this.consume(TokenType.RBRACE, "Expected '}'");
+
+    return { type: 'ValidateStatement', target, fields, line };
+  }
+
+  private parseValidationField(): AST.ValidationField {
+    const name = this.consume(TokenType.IDENTIFIER, "Expected field name").value;
+    this.consume(TokenType.COLON, "Expected ':'");
+
+    let optional = false;
+    if (this.match(TokenType.OPTIONAL)) {
+      optional = true;
+    }
+
+    // Parse type: string, number, boolean, array, object
+    const typeToken = this.consume(TokenType.IDENTIFIER, "Expected type name");
+    const fieldType = typeToken.value;
+
+    let nested: AST.ValidationField[] | undefined;
+    if (fieldType === 'object' && this.check(TokenType.LBRACE)) {
+      this.consume(TokenType.LBRACE, "Expected '{'");
+      nested = [];
+      while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+        nested.push(this.parseValidationField());
+      }
+      this.consume(TokenType.RBRACE, "Expected '}'");
+    }
+
+    return { name, fieldType, optional, nested };
+  }
+
+  // server 3000
+  // server port
+  private parseServerDeclaration(): AST.ServerDeclaration {
+    const line = this.peek().line;
+    this.consume(TokenType.SERVER, "Expected 'server'");
+    const port = this.parseExpression();
+
+    return { type: 'ServerDeclaration', port, line };
+  }
+
   // ============ Expression Parsing (Pratt Parser) ============
 
   private parseExpression(): AST.Expression {
@@ -207,7 +362,7 @@ export class Parser {
   }
 
   private parseAssignment(): AST.Expression {
-    const expr = this.parseEquality();
+    const expr = this.parseOr();
 
     if (this.match(TokenType.ASSIGN)) {
       const line = this.previous().line;
@@ -227,6 +382,30 @@ export class Parser {
     }
 
     return expr;
+  }
+
+  private parseOr(): AST.Expression {
+    let left = this.parseAnd();
+
+    while (this.match(TokenType.OR)) {
+      const line = this.previous().line;
+      const right = this.parseAnd();
+      left = { type: 'BinaryExpression', operator: 'or', left, right, line };
+    }
+
+    return left;
+  }
+
+  private parseAnd(): AST.Expression {
+    let left = this.parseEquality();
+
+    while (this.match(TokenType.AND)) {
+      const line = this.previous().line;
+      const right = this.parseEquality();
+      left = { type: 'BinaryExpression', operator: 'and', left, right, line };
+    }
+
+    return left;
   }
 
   private parseEquality(): AST.Expression {
@@ -362,6 +541,14 @@ export class Parser {
       return { type: 'BooleanLiteral', value: false, line: this.previous().line };
     }
 
+    if (this.match(TokenType.NULL)) {
+      return { type: 'NullLiteral', line: this.previous().line };
+    }
+
+    if (this.match(TokenType.LBRACE)) {
+      return this.parseObjectExpression();
+    }
+
     if (this.match(TokenType.IDENTIFIER)) {
       return {
         type: 'Identifier',
@@ -400,6 +587,34 @@ export class Parser {
     this.consume(TokenType.RBRACKET, "Expected ']'");
 
     return { type: 'ArrayExpression', elements, line };
+  }
+
+  private parseObjectExpression(): AST.ObjectExpression {
+    const line = this.previous().line;
+    const properties: AST.ObjectProperty[] = [];
+
+    if (!this.check(TokenType.RBRACE)) {
+      do {
+        // Key can be identifier or string
+        let key: string;
+        if (this.match(TokenType.STRING)) {
+          key = this.previous().value;
+        } else if (this.match(TokenType.IDENTIFIER) || this.isKeyword(this.peek().type)) {
+          if (this.isKeyword(this.peek().type)) this.advance();
+          key = this.previous().value;
+        } else {
+          throw this.error("Expected property name");
+        }
+
+        this.consume(TokenType.COLON, "Expected ':' after property name");
+        const value = this.parseExpression();
+        properties.push({ key, value });
+      } while (this.match(TokenType.COMMA));
+    }
+
+    this.consume(TokenType.RBRACE, "Expected '}'");
+
+    return { type: 'ObjectExpression', properties, line };
   }
 
   private parseFunctionExpression(): AST.FunctionExpression {
@@ -476,6 +691,18 @@ export class Parser {
       TokenType.FALSE,
       TokenType.RETURN,
       TokenType.PRINT,
+      TokenType.ENDPOINT,
+      TokenType.GET,
+      TokenType.POST,
+      TokenType.PUT,
+      TokenType.DELETE,
+      TokenType.PATCH,
+      TokenType.MIDDLEWARE,
+      TokenType.USE,
+      TokenType.NEXT,
+      TokenType.VALIDATE,
+      TokenType.OPTIONAL,
+      TokenType.SERVER,
     ].includes(type);
   }
 }

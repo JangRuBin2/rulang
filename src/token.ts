@@ -1,56 +1,73 @@
 export enum TokenType {
   // Literals
-  NUMBER = 'NUMBER',
-  STRING = 'STRING',
-  IDENTIFIER = 'IDENTIFIER',
+  NUMBER = "NUMBER",
+  STRING = "STRING",
+  IDENTIFIER = "IDENTIFIER",
 
   // Keywords
-  STATE = 'STATE',
-  TRANSITION = 'TRANSITION',
-  WHEN = 'WHEN',
-  LET = 'LET',
-  FN = 'FN',
-  IF = 'IF',
-  ELSE = 'ELSE',
-  TRUE = 'TRUE',
-  FALSE = 'FALSE',
-  RETURN = 'RETURN',
-  PRINT = 'PRINT',
+  STATE = "STATE",
+  TRANSITION = "TRANSITION",
+  WHEN = "WHEN",
+  LET = "LET",
+  FN = "FN",
+  IF = "IF",
+  ELSE = "ELSE",
+  TRUE = "TRUE",
+  FALSE = "FALSE",
+  NULL = "NULL",
+  RETURN = "RETURN",
+  PRINT = "PRINT",
+  AND = "AND",
+  OR = "OR",
+
+  // API Keywords
+  ENDPOINT = "ENDPOINT",
+  GET = "GET",
+  POST = "POST",
+  PUT = "PUT",
+  DELETE = "DELETE",
+  PATCH = "PATCH",
+  MIDDLEWARE = "MIDDLEWARE",
+  USE = "USE",
+  NEXT = "NEXT",
+  VALIDATE = "VALIDATE",
+  OPTIONAL = "OPTIONAL",
+  SERVER = "SERVER",
 
   // Operators
-  PLUS = 'PLUS',
-  MINUS = 'MINUS',
-  STAR = 'STAR',
-  SLASH = 'SLASH',
-  PERCENT = 'PERCENT',
-  ARROW = 'ARROW',         // ->
+  PLUS = "PLUS",
+  MINUS = "MINUS",
+  STAR = "STAR",
+  SLASH = "SLASH",
+  PERCENT = "PERCENT",
+  ARROW = "ARROW", // ->
 
   // Comparison
-  EQ = 'EQ',               // ==
-  NEQ = 'NEQ',             // !=
-  LT = 'LT',
-  GT = 'GT',
-  LTE = 'LTE',
-  GTE = 'GTE',
+  EQ = "EQ", // ==
+  NEQ = "NEQ", // !=
+  LT = "LT",
+  GT = "GT",
+  LTE = "LTE",
+  GTE = "GTE",
 
   // Assignment
-  ASSIGN = 'ASSIGN',       // =
+  ASSIGN = "ASSIGN", // =
 
   // Delimiters
-  LPAREN = 'LPAREN',
-  RPAREN = 'RPAREN',
-  LBRACE = 'LBRACE',
-  RBRACE = 'RBRACE',
-  LBRACKET = 'LBRACKET',
-  RBRACKET = 'RBRACKET',
-  COMMA = 'COMMA',
-  SEMICOLON = 'SEMICOLON',
-  DOT = 'DOT',
-  COLON = 'COLON',
+  LPAREN = "LPAREN",
+  RPAREN = "RPAREN",
+  LBRACE = "LBRACE",
+  RBRACE = "RBRACE",
+  LBRACKET = "LBRACKET",
+  RBRACKET = "RBRACKET",
+  COMMA = "COMMA",
+  SEMICOLON = "SEMICOLON",
+  DOT = "DOT",
+  COLON = "COLON",
 
   // Special
-  EOF = 'EOF',
-  NEWLINE = 'NEWLINE',
+  EOF = "EOF",
+  NEWLINE = "NEWLINE",
 }
 
 export interface Token {
@@ -70,6 +87,22 @@ export const KEYWORDS: Record<string, TokenType> = {
   else: TokenType.ELSE,
   true: TokenType.TRUE,
   false: TokenType.FALSE,
+  null: TokenType.NULL,
   return: TokenType.RETURN,
   print: TokenType.PRINT,
+  and: TokenType.AND,
+  or: TokenType.OR,
+  // API Keywords
+  endpoint: TokenType.ENDPOINT,
+  GET: TokenType.GET,
+  POST: TokenType.POST,
+  PUT: TokenType.PUT,
+  DELETE: TokenType.DELETE,
+  PATCH: TokenType.PATCH,
+  middleware: TokenType.MIDDLEWARE,
+  use: TokenType.USE,
+  next: TokenType.NEXT,
+  validate: TokenType.VALIDATE,
+  optional: TokenType.OPTIONAL,
+  server: TokenType.SERVER,
 };

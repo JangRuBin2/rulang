@@ -19,7 +19,12 @@ export type Statement =
   | PrintStatement
   | IfStatement
   | ReturnStatement
-  | BlockStatement;
+  | BlockStatement
+  | EndpointDeclaration
+  | MiddlewareDeclaration
+  | UseStatement
+  | ValidateStatement
+  | ServerDeclaration;
 
 export interface StateDeclaration {
   type: 'StateDeclaration';
@@ -88,6 +93,52 @@ export interface BlockStatement {
   line: number;
 }
 
+// ============ API Statements ============
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
+export interface EndpointDeclaration {
+  type: 'EndpointDeclaration';
+  method: HttpMethod;
+  path: string;
+  middlewares: string[];  // middleware names to apply
+  body: BlockStatement;
+  line: number;
+}
+
+export interface MiddlewareDeclaration {
+  type: 'MiddlewareDeclaration';
+  name: string;
+  body: BlockStatement;
+  line: number;
+}
+
+export interface UseStatement {
+  type: 'UseStatement';
+  middlewares: string[];
+  line: number;
+}
+
+export interface ValidationField {
+  name: string;
+  fieldType: string;  // 'string' | 'number' | 'boolean' | 'array' | 'object'
+  optional: boolean;
+  nested?: ValidationField[];  // for object type
+}
+
+export interface ValidateStatement {
+  type: 'ValidateStatement';
+  target: Expression;  // e.g., req.body
+  fields: ValidationField[];
+  line: number;
+}
+
+export interface ServerDeclaration {
+  type: 'ServerDeclaration';
+  port: Expression;
+  line: number;
+}
+
 // ============ Expressions ============
 
 export type Expression =
@@ -95,11 +146,13 @@ export type Expression =
   | NumberLiteral
   | StringLiteral
   | BooleanLiteral
+  | NullLiteral
   | BinaryExpression
   | UnaryExpression
   | CallExpression
   | MemberExpression
   | ArrayExpression
+  | ObjectExpression
   | FunctionExpression;
 
 export interface Identifier {
@@ -123,6 +176,11 @@ export interface StringLiteral {
 export interface BooleanLiteral {
   type: 'BooleanLiteral';
   value: boolean;
+  line: number;
+}
+
+export interface NullLiteral {
+  type: 'NullLiteral';
   line: number;
 }
 
@@ -158,6 +216,17 @@ export interface MemberExpression {
 export interface ArrayExpression {
   type: 'ArrayExpression';
   elements: Expression[];
+  line: number;
+}
+
+export interface ObjectProperty {
+  key: string;
+  value: Expression;
+}
+
+export interface ObjectExpression {
+  type: 'ObjectExpression';
+  properties: ObjectProperty[];
   line: number;
 }
 
